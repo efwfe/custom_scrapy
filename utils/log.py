@@ -1,7 +1,7 @@
 # _*_coding:utf-8_*_
 import sys
 import logging
-from scapy_custom.conf import settings
+from scrapy_custom.conf import settings
 
 class Logger(object):
 

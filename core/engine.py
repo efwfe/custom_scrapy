@@ -5,26 +5,30 @@ from scrapy_custom.http.request import Request
 from scrapy_custom.middlewares import downloader_middlewares, spider_midllewares
 from scrapy_custom.utils.log import logger
 from .downloader import Downloader
-from .pipeline import Pipeline
+# from .pipeline import Pipeline
 from .scheduler import Scheduler
 
 
 class Engine:
-    def __init__(self, spiders):
+    def __init__(self, spiders,pipelines=[],spider_middlewares=[], downloader_middlewares =[]):
         self.spiders = spiders
         self.scheduler = Scheduler()
         self.downloader = Downloader()
-        self.pipeline = Pipeline()
-        self.spider_mid = spider_midllewares.SpiderMidlleware()
-        self.downloader_mid = downloader_middlewares.DownloaderMiddleware()
+        self.pipelines = pipelines
+        # self.spider_mid = spider_midllewares.SpiderMidlleware()
+        # self.downloader_mid = downloader_middlewares.DownloaderMiddleware()
+        self.spider_mids = spider_middlewares
+        self.downloader_mids = downloader_middlewares
 
         self.total_response_number = 0
 
     def _start_requests(self):
-
+        # 添加请求到调度器
         for spider_name, spider in self.spiders.items():
             for start_request in spider.start_requests():
-                start_request = self.spider_mid.process_request(start_request)
+                # spider middleware
+                for spider_mid in self.spider_mids:
+                    start_request = spider_mid.process_request(start_request)
                 # add name to the request && add to scheduler
                 start_request.spider_name = spider_name
                 self.scheduler.add_request(start_request)
@@ -35,13 +39,15 @@ class Engine:
             return
 
         # downloader process request
-        request = self.downloader_mid.process_request(request)
+        for downloader_mid in self.downloader_mids:
+             request = downloader_mid.process_request(request)
         # download the response
         response = self.downloader.get_response(request)
         response.meta = request.meta
 
         # downloader process response
-        response = self.downloader_mid.process_response(response)
+        for downloader_mid in self.downloader_mids:
+            response = downloader_mid.process_response(response)
 
         # get the spider
         spider = self.spiders[request.spider_name]
@@ -52,12 +58,15 @@ class Engine:
         for result in results:
             if isinstance(result, Request):
                 #  is Request back to scheduler
-                result = self.spider_mid.process_request(result)
+                for spider_mid in self.spider_mids:
+                    result = spider_mid.process_request(result)
                 self.scheduler.add_request(result)
             else:
                 # pipeline solve the result
-                result = self.spider_mid.process_response(result)
-                self.pipeline.process_item(result)
+                for spider_mid in self.spider_mids:
+                    result = spider_mid.process_response(result)
+                for pipeline in self.pipelines:
+                    pipeline.process_item(result, spider)
 
         self.total_response_number += 1
 
