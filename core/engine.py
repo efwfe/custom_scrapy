@@ -11,8 +11,8 @@ from scrapy_custom.middlewares import downloader_middlewares,spider_midllewares
 from scrapy_custom.utils.log import logger
 
 class Engine:
-    def __init__(self):
-        self.spider = Spider()
+    def __init__(self,spider):
+        self.spider = spider
         self.scheduler = Scheduler()
         self.downloader =Downloader()
         self.pipeline = Pipeline()
