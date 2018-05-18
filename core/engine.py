@@ -31,13 +31,20 @@ class Engine:
         if request is None:
             return
 
-        # downloader showtime
+        # downloader process request
         request = self.downloader_mid.process_request(request)
+        # download the response
         response = self.downloader.get_response(request)
+        response.meta = request.meta
+
+        # downloader process response
         response = self.downloader_mid.process_response(response)
 
 
-        results = self.spider.parse(response)
+        # user custom parse
+        parse = getattr(self.spider, request.parse)
+        results = parse(response)
+
 
         for result in results:
             if isinstance(result,Request):
