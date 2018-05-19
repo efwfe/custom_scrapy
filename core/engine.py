@@ -1,26 +1,45 @@
 # _*_coding:utf-8_*_
 from datetime import datetime
-
+import importlib
 from scrapy_custom.http.request import Request
-from scrapy_custom.middlewares import downloader_middlewares, spider_midllewares
 from scrapy_custom.utils.log import logger
 from .downloader import Downloader
-# from .pipeline import Pipeline
 from .scheduler import Scheduler
+from scrapy_custom.conf.settings import SPIDERS,PIPELINES,SPIDER_MIDDLEWARES, \
+    DOWNLOADER_MIDDLEWARES
 
 
 class Engine:
-    def __init__(self, spiders,pipelines=[],spider_middlewares=[], downloader_middlewares =[]):
-        self.spiders = spiders
+    def __init__(self):
+
         self.scheduler = Scheduler()
         self.downloader = Downloader()
-        self.pipelines = pipelines
+        self.spiders = self._auto_import_instances(SPIDERS,is_spider=True)
+        self.pipelines = self._auto_import_instances(PIPELINES)
         # self.spider_mid = spider_midllewares.SpiderMidlleware()
         # self.downloader_mid = downloader_middlewares.DownloaderMiddleware()
-        self.spider_mids = spider_middlewares
-        self.downloader_mids = downloader_middlewares
+        self.spider_mids = self._auto_import_instances(SPIDER_MIDDLEWARES)
+        self.downloader_mids = self._auto_import_instances(DOWNLOADER_MIDDLEWARES)
 
         self.total_response_number = 0
+        self.total_request_number = 0
+
+    def _auto_import_instances(self, path, is_spider = False):
+        instances = []
+        if is_spider:
+            instances = {}
+        for p in path:
+            module_path = p.rsplit('.',1)[0]
+            cls_name = p.rsplit('.',1)[-1]
+
+            ret = importlib.import_module(module_path)
+            cls = getattr(ret, cls_name)
+            if is_spider:
+                instances[cls.name] = cls()
+            else:
+                instances.append(cls())
+        return instances
+
 
     def _start_requests(self):
         # 添加请求到调度器
@@ -61,6 +80,7 @@ class Engine:
                 for spider_mid in self.spider_mids:
                     result = spider_mid.process_request(result)
                 self.scheduler.add_request(result)
+                self.total_request_number += 1
             else:
                 # pipeline solve the result
                 for spider_mid in self.spider_mids:
@@ -74,7 +94,7 @@ class Engine:
         self._start_requests()
         while True:
             self._execute_request_response_item()
-            if self.total_response_number >= self.scheduler.total_request_number:
+            if self.total_response_number >= self.total_request_number:
                 break
 
     def start(self):
