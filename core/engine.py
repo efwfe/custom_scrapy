@@ -51,6 +51,7 @@ class Engine:
                 # add name to the request && add to scheduler
                 start_request.spider_name = spider_name
                 self.scheduler.add_request(start_request)
+                self.total_request_number += 1
 
     def _execute_request_response_item(self):
         request = self.scheduler.get_request()
